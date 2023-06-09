@@ -5,8 +5,8 @@ This is custom Midjourney API. Using it you could generate images by code. Worki
 !! Don't forget Modjourney TOS doesn't allow any automation, so this project is research only purpose !!
 
 Contains: 
-- Sender: for sending prompts to Midjourney
-- Receiver: works in terminal, download all the completed images to local folder
+- Midjournal Bot Telegram: Telegram Bot to Prompt Midjourney
+- Image Handler: send and retrieve requests to Midjourney
 
 Installation:
 1. Create Discord account and create your server(instruction here: https://discord.com/blog/starting-your-first-discord-server)
