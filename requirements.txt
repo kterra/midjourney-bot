@@ -1,0 +1,8 @@
+discord.py
+json
+numpy
+pandas
+python-dotenv
+pyautogui
+python-telegram-bot
+requests

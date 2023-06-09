@@ -1,0 +1,19 @@
+Implementar:
+[x] requisição POST para describe 
+    [x] requisição upload
+[x] requisição GET para recuperar prompt
+[x] requsição POST para imagine
+[x] requisição POST para upscale da imagem U1
+[x] requisição GET para recuperar última imagem
+[ ] como esperar resultado do midjourney? 
+    [ ] read (Waiting to start) para pedir o upsample
+    [ ] ouvir até chegar resposta com mesmo id no payload?
+[x] criar Bot no Telegram com BotFather
+[x] receber imagem no Telegram
+[x] responder com imagem no Telegram
+[ ] baixar e salvar imagens do imagine (inserir imagine no filename)
+[ ] baixar e salvar imagens do upsample (inserir upsample no filename)
+[ ] salvar prompts gerados
+[x] midjournalbot no Telegram local
+[ ] midjournalbot no Telegram servidor
+
