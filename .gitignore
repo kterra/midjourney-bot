@@ -3,5 +3,3 @@ img/
 old/
 secure-files/
 venv/
-.vscode/
-__pycache__
