@@ -13,6 +13,7 @@ bot.
 
 import logging
 import os
+import time
 import imageHandler
 from telegram import ForceReply, Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
@@ -51,30 +52,35 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Stores the photo and asks for a location."""
     user = update.message.from_user
     img_file = await update.message.photo[-1].get_file()
-    img_name = user.first_name.lower() + "_photo.jpg"
-    img_path = "img/" + img_name
+    img_name = f'{user.first_name.lower()}_{time.time()}.jpg'
+    img_path = "img/users/" + img_name
 
     await img_file.download_to_drive(img_path)
     logger.info("Photo of %s: %s", user.first_name, img_name)
-    handle_image(img_path) 
+    await update.message.reply_text(f"Gerando imagem...")
+    ai_img_path, prompt = handle_image(img_name)
+    if ai_img_path == '':
+        await update.message.reply_text(f"Tempo excedido! Tente novamente com outra imagem.")
+    else: 
+        await update.message.reply_photo(photo=open(ai_img_path, "rb"))
+        await update.message.reply_text(f"Descrição: {prompt}")
+         
 
-    ai_img_path = "img/ai_img.png"
-    await update.message.reply_photo(photo=open(ai_img_path, "rb"))
 
-
-def handle_image(img_path):
+def handle_image(img_name):
         
         # img_sender = sender.Sender()
         # prompt = img_sender.describe_static()
         # prompt = sender.describe(img_path)
         # img_sender.imagine(prompt)
-        imageHandler.ImageHandler().get_ai_img(img_path)
+        handler = imageHandler.ImageHandler(img_name)
+        return handler.get_ai_img()
 
 
 def main() -> None:
     """Start the bot."""
     # Create the Application and pass it your bot's token.
-    arquivo = open("files/token.txt")
+    arquivo = open("secure-files/token.txt")
     token = arquivo.read()
     application = Application.builder().token(token).build()
 

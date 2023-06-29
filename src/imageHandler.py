@@ -11,9 +11,10 @@ import sys
 
 class ImageHandler:
 
-    def __init__(self):
+    def __init__(self, img_name):
         
         self.params = '/Users/kizzyterra/Workspace/midjourney-bot/secure-files/handler_params.json'
+        self.img_name = img_name
         self.handler_initializer()
         self.df = pd.DataFrame(columns = ['prompt', 'url', 'filename', 'is_downloaded'])
 
@@ -23,6 +24,7 @@ class ImageHandler:
             params = json.load(json_file)
 
         self.img_folder = params['img_folder']
+        self.img_path =self.img_folder +'users/' + self.img_name
 
         self.channel_id=params['channel_id']
         self.authorization=params['authorization']
@@ -46,18 +48,18 @@ class ImageHandler:
         random_prompt = random.randint(0,3)
         return prompts[random_prompt]
     
-    def upload(self, img_name):
+    def upload(self):
         #https://stackoverflow.com/questions/76092002/uploading-files-to-discord-api-thought-put-using-python-requests
         header = {
                 'authorization': self.authorization
             }
         
-        img_path = self.img_folder + img_name
+        img_path = self.img_path
         img_size = os.path.getsize(img_path)
         img = open(img_path, 'rb')
         file_id = 1
         payload = {
-            "files":[{"filename":img_name,"file_size":img_size,"id":file_id}]
+            "files":[{"filename":self.img_name,"file_size":img_size,"id":file_id}]
             }
         post_response = requests.post(f'https://discord.com/api/v9/channels/{self.channel_id}/attachments', json = payload , headers = header)
         print(f"POST response: {post_response.status_code}")
@@ -76,16 +78,16 @@ class ImageHandler:
         print(f"PUT response: {put_response.status_code}")
         put_response.raise_for_status()
 
-        print('upload successfully sent!')
+        print(f'File {attachment_uploaded_filename} upload successfully sent!')
 
         return attachment_uploaded_filename
         
-    def describe(self, img_name):
+    def describe(self):
             header = {
                 'authorization': self.authorization
             }
             
-            uploaded_filename = self.upload(img_name)
+            uploaded_filename = self.upload()
             filename = uploaded_filename.split("/")[1]
 
             payload = {'type': 2, 
@@ -99,9 +101,9 @@ class ImageHandler:
                 'name': 'describe',
                 'type': 1,
                 "options":[{"type":11,"name":"image","value":0}],
-                "application_command":{"id":"1092492867185950852",
-                                       "application_id":"936929561302675456",
-                                       "version":"1092492867185950853",
+                "application_command":{"id": self.id_describe,
+                                       "application_id": self.application_id,
+                                       "version": self.version_describe,
                                        "type":1,
                                        "nsfw":False,
                                        "name":"describe",
@@ -120,25 +122,14 @@ class ImageHandler:
            
             print('describe successfully sent!')
     
-    def get_describe_prompts(self):
-        message_list = self.retrieve_messages()
-        prompts_list = []
-        for message in message_list:
-            if message['embeds']:
-                # print(message['embeds'][0]['description'])
-                prompts_list =  message['embeds'][0]['description'].split('\n\n')
-                #clean prompts
-                #store prompts
-        print('prompts succesfully read!')
-        return prompts_list     
-
-    def describe_prompt(self, img_name):
-        self.describe(img_name)
+    def describe_prompt(self):
+        self.describe()
         prompts = self.get_describe_prompts()
         while len(prompts) == 0:
+            print('Sleep (5): Waiting Describe...')
             time.sleep(5)
             prompts = self.get_describe_prompts()
-
+        
         return prompts[0]
 
     def imagine(self, prompt):
@@ -168,7 +159,7 @@ class ImageHandler:
                 exit()
 
         while r.status_code != 204:
-            r = requests.post('https://discord.com/api/v9/interactions', json = payload , headers = header)
+            r = requests.post('https://discord.com/api/v9/interactions', json = payload , headers = self.header)
 
         print(f'imagine prompt [{prompt}] successfully sent!')
 
@@ -209,35 +200,135 @@ class ImageHandler:
         print(f'Upscale request for message_id [{message_id}] and image [{upsample}] successfully sent!')
 
     def get_upsample_ids(self):
-        message_list  = self.retrieve_messages()
+        message_list  = self.retrieve_messages(1)
         upsamples = {}
         for message in message_list:
-            print('********')
-            if (message['author']['username'] == 'Midjourney Bot') and (len(message['components'][0]['components'])>3):
-                components = message['components'][0]['components']
-                # print(components)
-                upsamples['message_id'] = message['id']
-                upsamples['U1'] = components[0]['custom_id']
-                upsamples['U2'] = components[1]['custom_id']
-                upsamples['U3'] = components[2]['custom_id']
-                upsamples['U4'] = components[3]['custom_id']
-                print(upsamples)
-            else:
+            try:
+                if (message['author']['username'] == 'Midjourney Bot') and (len(message['components'][0]['components'])>3):
+                    components = message['components'][0]['components']
+                    # print(components)
+                    upsamples['message_id'] = message['id']
+                    upsamples['U1'] = components[0]['custom_id']
+                    upsamples['U2'] = components[1]['custom_id']
+                    upsamples['U3'] = components[2]['custom_id']
+                    upsamples['U4'] = components[3]['custom_id']
+                    print('Upsamples retrieved!')
+                    print(upsamples)
+                else:
+                    print("No upsample found!")
+            except:
                 print("No upsample found!")
             return upsamples
 
-    def retrieve_messages(self):
+    def retrieve_messages(self, number):
         r = requests.get(
-            f'https://discord.com/api/v10/channels/{self.channel_id}/messages?limit={2}', headers=self.header)
+            f'https://discord.com/api/v10/channels/{self.channel_id}/messages?limit={number}', headers=self.header)
         response = json.loads(r.text)
         
         # print(response)
-        print('=========================================')
+        print(f'{number} message(s) retrieved!')
         
         return response
 
+    def clean(self, prompts_list):
+        cleaned_prompts = []
+        
+        for prompt in prompts_list:
+            # Remove emojis
+            prompt_sem_emojis = re.sub(r'[^\x00-\x7F]+', '', prompt)[2:]
+            prompt_sem_links = re.sub(r'http\S+|www\S+', '', prompt_sem_emojis)
+            prompt_sem_colchetes = re.sub(r'\[|\]', '', prompt_sem_links)
+            prompt_sem_parenteses = re.sub(r'\(|\)', '', prompt_sem_colchetes)
+            cleaned_prompts.append(prompt_sem_parenteses)
+        
+        return cleaned_prompts
+
+    def get_describe_prompts(self):
+        message_list = self.retrieve_messages(1)
+        message = message_list[0]
+        prompts_list = []
+        try:
+            # print(message['embeds'][0]['description'])
+            prompts_list =  self.clean(message['embeds'][0]['description'].split('\n\n'))
+            #store prompts
+            print('prompts succesfully read!')
+            
+        except IndexError:
+            print('describe not found!')
+        except KeyError:
+            print('this is not a describe response!')
+        
+        return prompts_list
+  
+    def get_imagine_response(self):
+        message_list  = self.retrieve_messages(1)
+        imagine_status = 0
+        for message in message_list:
+            try:
+                if (message['author']['username'] == 'Midjourney Bot') and ('**' in message['content']) and (len(message['components'][0]['components'])>3):
+                    if len(message['attachments']) > 0:
+
+                        # id = message['id']
+                        # prompt = message['content'].split('**')[1].split(' --')[0]
+                        url = message['attachments'][0]['url']
+                        filename = message['attachments'][0]['filename']
+                        filepath = os.path.join(self.img_folder + 'ai/', filename)
+                        response = requests.get(url)
+                        with open(filepath, "wb") as req:
+                            req.write(response.content)
+                        print(f'image {filename} downloaded successfully!')
+                        imagine_status = 1
+            except:
+                print(f'Imagine not completed!')
+                    
+        return imagine_status
+                
+
+    def download_imagine_response(self):
+        imagine_status = self.get_imagine_response()
+        attempts = 0
+        while imagine_status == 0 and attempts<10:
+            print('Sleep (60): Waiting Imagine...')
+            time.sleep(60)
+            try:
+                imagine_status = self.get_imagine_response()
+                attempts =  attempts + 1
+            except json.JSONDecodeError:
+                print ('retrieving message Error')
+        return imagine_status
+
+    def download_upsample_response(self):
+        upsample_filename = self.get_upsample_response()
+        while upsample_filename == '':
+            print('Sleep (10): Waiting Upsample...')
+            time.sleep(10)
+            try:
+                upsample_filename = self.get_upsample_response()
+            except json.JSONDecodeError:
+                print ('retrieving message Error')
+        return upsample_filename
+
+    def get_upsample_response(self):
+        message_list  = self.retrieve_messages(1)
+        filepath = ''
+        for message in message_list:
+            if (message['author']['username'] == 'Midjourney Bot') and ('Image #1' in message['content']):
+                if len(message['attachments']) > 0:
+                    if (message['attachments'][0]['filename'][-4:] == '.png'):
+                        # id = message['id']
+                        # prompt = message['content'].split('**')[1].split(' --')[0]
+                        url = message['attachments'][0]['url']
+                        filename = message['attachments'][0]['filename']
+                        filepath = os.path.join(self.img_folder + 'ai/', filename)
+                        response = requests.get(url)
+                        with open(filepath, "wb") as req:
+                                req.write(response.content)
+                        print(f'image {filename} downloaded successfully!')
+        
+        return filepath
+
     def collecting_results(self):
-        message_list  = self.retrieve_messages()
+        message_list  = self.retrieve_messages(1)
         self.awaiting_list = pd.DataFrame(columns = ['prompt', 'status'])
         for message in message_list:
             if (message['author']['username'] == 'Midjourney Bot') and ('Image #1' in message['content']):
@@ -287,7 +378,7 @@ class ImageHandler:
         for i in self.df.index:
             if self.df.loc[i].is_downloaded == 0:
                 response = requests.get(self.df.loc[i].url)
-                with open(os.path.join(self.img_folder, self.df.loc[i].filename), "wb") as req:
+                with open(os.path.join(self.img_folder + 'ai/', self.df.loc[i].filename), "wb") as req:
                     req.write(response.content)
                 self.df.loc[i, 'is_downloaded'] = 1
                 processed_prompts.append(self.df.loc[i].prompt)
@@ -302,18 +393,23 @@ class ImageHandler:
         self.outputer()
         self.downloading_results()
 
-    def get_ai_img(self, img_name):
-        prompt = self.describe_prompt(img_name)
+    def get_ai_img(self):
+        prompt = self.describe_prompt()
         self.imagine(prompt)
-        self.upsample('U1')
-        self.get_images()
-        print('image downloaded successfully!')
+        download_status = self.download_imagine_response()
+        ai_img_path = ''
+        if download_status == 1: 
+            self.upsample('U1')
+            ai_img_path = self.download_upsample_response()
+        return (ai_img_path, prompt)
+        
+        
+# if __name__ == "__main__":
 
-
-if __name__ == "__main__":
-
-    # img_path= "/Users/kizzyterra/Workspace/midjourney-bot/img/img-tst-1.jpg"
-    handler = ImageHandler() 
-
-    img_name = 'death-stranding.jpg'
-    handler.get_ai_img(img_name)
+#     # # img_path= "/Users/kizzyterra/Workspace/midjourney-bot/img/img-tst-1.jpg"
+#     # img_name = 'death-stranding.jpg'
+#     # handler = ImageHandler(img_name) 
+#     # # handler.get_imagine_response()
+    
+#     # handler.get_ai_img()
+#     # # handler.describe_prompt()
